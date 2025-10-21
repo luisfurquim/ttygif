@@ -1,0 +1,4 @@
+github.com/sugyan/ttygif v0.0.0-20160926114937-b539f0e7d1a9 h1:DG1dPcpI3bWM2ZUwMVowTkoTsb9ZQyeA5hj9R6bKngQ=
+github.com/sugyan/ttygif v0.0.0-20160926114937-b539f0e7d1a9/go.mod h1:1yZppaBOgH2/xw8X4KwQICxsVwYGR711vqJKcL7SdC8=
+github.com/sugyan/ttyread v0.0.0-20140728103301-67501e8d8a3b h1:KYZVBwvdVc06d6Ek05iCor2cfzPFJfPPxRYgeFEuNU0=
+github.com/sugyan/ttyread v0.0.0-20140728103301-67501e8d8a3b/go.mod h1:d/TGn4oaNPxMJBwKX/b0AMYbAoHOClnhSWwAdTubCzw=

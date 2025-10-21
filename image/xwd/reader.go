@@ -49,7 +49,9 @@ type XWDColorMap struct {
 
 // Decode reads a XWD image from r and returns it as an image.Image.
 func Decode(r io.Reader) (img image.Image, err error) {
-	buf := make([]byte, 100)
+	var buf []byte
+
+	buf = make([]byte, 100)
 	_, err = r.Read(buf)
 	if err != nil {
 		return
@@ -89,8 +91,8 @@ func Decode(r io.Reader) (img image.Image, err error) {
 	}
 	// not used?
 	colorMaps := make([]XWDColorMap, header.ColorMapEntries)
+	buf = make([]byte, 12)
 	for i := 0; i < int(header.ColorMapEntries); i++ {
-		buf := make([]byte, 12)
 		_, err = r.Read(buf)
 		if err != nil {
 			return
@@ -107,9 +109,9 @@ func Decode(r io.Reader) (img image.Image, err error) {
 	// create PalettedImage
 	rect := image.Rect(0, 0, int(header.PixmapWidth), int(header.PixmapHeight))
 	paletted := image.NewPaletted(rect, palette.WebSafe)
+	buf = make([]byte, 4)
 	for x := 0; x < int(header.PixmapHeight); x++ {
 		for y := 0; y < int(header.PixmapWidth); y++ {
-			buf := make([]byte, 4)
 			_, err = r.Read(buf)
 			if err != nil {
 				return

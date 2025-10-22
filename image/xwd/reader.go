@@ -161,9 +161,9 @@ var xwdModel color.Model = color.ModelFunc(func(c color.Color) color.Color {
     }
     r, g, b, _ := c.RGBA()
     return Color{
-        r: uint8(r >> 8),
-        g: uint8(g >> 8),
-        b: uint8(b >> 8),
+        r: uint32(r >> 8),
+        g: uint32(g >> 8),
+        b: uint32(b >> 8),
     }
 })
 

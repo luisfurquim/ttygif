@@ -144,18 +144,45 @@ func (img Xwd) Bounds() image.Rectangle {
 }
 
 func (img Xwd) At(x, y int) color.Color {
+	var offset int
+
+	offset = x << 2
+
 	return Color{
-		r: uint32(img.buffer[y][x<<2 + 2]),
-		g: uint32(img.buffer[y][x<<2 + 1]),
-		b: uint32(img.buffer[y][x<<2]),
+		r: uint32(img.buffer[y][offset + 2]),
+		g: uint32(img.buffer[y][offset + 1]),
+		b: uint32(img.buffer[y][offset]),
 	}
 }
 
+var xwdModel color.Model = color.ModelFunc(func(c color.Color) color.Color {
+    if _, ok := c.(Color); ok {
+        return c
+    }
+    r, g, b, _ := c.RGBA()
+    return Color{
+        r: uint8(r >> 8),
+        g: uint8(g >> 8),
+        b: uint8(b >> 8),
+    }
+})
+
 func (img Xwd) ColorModel() color.Model {
-	return color.RGBAModel
+	return xwdModel
 }
 
 func (c Color) RGBA() (r, g, b, a uint32) {
-	return c.r, c.g, c.b, 0
+	var r32, g32, b32 uint32
+
+   // Converte 0-255 para 0-65535 e retorna alpha opaco
+   r32 = uint32(c.r)
+   g32 = uint32(c.g)
+   b32 = uint32(c.b)
+    
+   r = (r32 << 8) | r32
+   g = (g32 << 8) | g32
+   b = (b32 << 8) | b32
+   a = 0xffff
+   return
 }
 

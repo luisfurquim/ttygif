@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"image"
 	"image/color"
-	"image/color/palette"
 	"io"
 )
 
@@ -47,8 +46,18 @@ type XWDColorMap struct {
 	Padding     uint8
 }
 
+type Xwd struct {
+	XWDFileHeader
+	bounds image.Rectangle
+	buffer [][]byte
+}
+
+type Color struct{
+	r, g, b uint32
+}
+
 // Decode reads a XWD image from r and returns it as an image.Image.
-func Decode(r io.Reader) (img image.Image, err error) {
+func Decode(r io.Reader) (img Xwd, err error) {
 	var buf []byte
 
 	buf = make([]byte, 100)
@@ -56,7 +65,7 @@ func Decode(r io.Reader) (img image.Image, err error) {
 	if err != nil {
 		return
 	}
-	header := XWDFileHeader{
+	img.XWDFileHeader = XWDFileHeader{
 		HeaderSize:        binary.BigEndian.Uint32(buf[0:4]),
 		FileVersion:       binary.BigEndian.Uint32(buf[4:8]),
 		PixmapFormat:      binary.BigEndian.Uint32(buf[8:12]),
@@ -83,16 +92,19 @@ func Decode(r io.Reader) (img image.Image, err error) {
 		WindowY:           binary.BigEndian.Uint32(buf[92:96]),
 		WindowBorderWidth: binary.BigEndian.Uint32(buf[96:100]),
 	}
+
+	// not used
 	// window name
-	windowName := make([]byte, header.HeaderSize-100)
+	windowName := make([]byte, img.HeaderSize-100)
 	_, err = r.Read(windowName)
 	if err != nil {
 		return
 	}
+
 	// not used?
-	colorMaps := make([]XWDColorMap, header.ColorMapEntries)
+	colorMaps := make([]XWDColorMap, img.ColorMapEntries)
 	buf = make([]byte, 12)
-	for i := 0; i < int(header.ColorMapEntries); i++ {
+	for i := 0; i < int(img.ColorMapEntries); i++ {
 		_, err = r.Read(buf)
 		if err != nil {
 			return
@@ -106,22 +118,44 @@ func Decode(r io.Reader) (img image.Image, err error) {
 			Padding:     uint8(buf[11]),
 		}
 	}
-	// create PalettedImage
-	rect := image.Rect(0, 0, int(header.PixmapWidth), int(header.PixmapHeight))
-	paletted := image.NewPaletted(rect, palette.WebSafe)
-	buf = make([]byte, 4)
-	for x := 0; x < int(header.PixmapHeight); x++ {
-		for y := 0; y < int(header.PixmapWidth); y++ {
-			_, err = r.Read(buf)
-			if err != nil {
-				return
-			}
-			paletted.Set(y, x, color.RGBA{
-				R: uint8(buf[2]),
-				G: uint8(buf[1]),
-				B: uint8(buf[0]),
-			})
+
+	img.buffer = make([][]byte, img.PixmapHeight)
+
+	for y := 0; y < int(img.PixmapHeight); y++ {
+		img.buffer[y] = make([]byte, 4 * img.PixmapWidth)
+		_, err = r.Read(img.buffer[y])
+		if err != nil {
+			return
 		}
 	}
-	return paletted, nil
+
+	return
 }
+
+
+func (img Xwd) Bounds() image.Rectangle {
+	return image.Rectangle{
+		Min: image.Point{},
+		Max: image.Point{
+			X: int(img.PixmapWidth),
+			Y: int(img.PixmapHeight),
+		},
+	}
+}
+
+func (img Xwd) At(x, y int) color.Color {
+	return Color{
+		r: uint32(img.buffer[y][x<<2 + 2]),
+		g: uint32(img.buffer[y][x<<2 + 1]),
+		b: uint32(img.buffer[y][x<<2]),
+	}
+}
+
+func (img Xwd) ColorModel() color.Model {
+	return color.RGBAModel
+}
+
+func (c Color) RGBA() (r, g, b, a uint32) {
+	return c.r, c.g, c.b, 0
+}
+

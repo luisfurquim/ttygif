@@ -248,3 +248,12 @@ func (c Color) RGBA() (r, g, b, a uint32) {
    return
 }
 
+
+func  MkColor(r, g, b byte) color.Color {
+	return Color{
+		r: uint32(r),
+		g: uint32(g),
+		b: uint32(b),
+	}
+}
+

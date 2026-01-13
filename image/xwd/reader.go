@@ -195,6 +195,32 @@ func DecodeNoCopy(buf []byte) (img Xwd, err error) {
 }
 
 
+// DecodePixNoCopy parses the pixels of a XWD image buffer into the xwd.Xwd image.
+// It is faster than Decode(r io.Reader), but holds the memory associated with the provided buffer.
+// Do not change the buffer contents after calling this function.
+// If in doubt, use Decode(r io.Reader) instead.
+func DecodePixNoCopy(buf []byte, img *Xwd) (err error) {
+	var linesize int
+	
+	linesize = int(img.PixmapWidth << 2)
+
+	if len(buf) < linesize * int(img.PixmapHeight) {
+		err = IncompleteBuffer
+		return
+	}
+
+	img.buffer = make([][]byte, img.PixmapHeight)
+
+	for y := 0; y < int(img.PixmapHeight); y++ {
+		img.buffer[y] = buf[:linesize]
+		buf = buf[linesize:]
+	}
+
+	return
+}
+
+
+
 func (img Xwd) Bounds() image.Rectangle {
 	return image.Rectangle{
 		Min: image.Point{},
@@ -253,7 +279,7 @@ func  MkColor(r, g, b byte) color.Color {
 	return Color{
 		r: uint32(r),
 		g: uint32(g),
-		b: uint32(b),
+		b: uint32(img.buffer[y][offset]),
 	}
 }
 

@@ -279,7 +279,7 @@ func  MkColor(r, g, b byte) color.Color {
 	return Color{
 		r: uint32(r),
 		g: uint32(g),
-		b: uint32(img.buffer[y][offset]),
+		b: uint32(b),
 	}
 }
 

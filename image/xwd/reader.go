@@ -51,6 +51,7 @@ type Xwd struct {
 	XWDFileHeader
 	bounds image.Rectangle
 	buffer [][]byte
+	Pixmap []byte
 }
 
 type Color struct{
@@ -62,6 +63,7 @@ var IncompleteBuffer error = errors.New("Incomplete buffer")
 // Decode reads a XWD image from r and returns it as an image.Image.
 func Decode(r io.Reader) (img Xwd, err error) {
 	var buf []byte
+	var start int
 
 	buf = make([]byte, 100)
 	_, err = r.Read(buf)
@@ -123,13 +125,16 @@ func Decode(r io.Reader) (img Xwd, err error) {
 	}
 
 	img.buffer = make([][]byte, img.PixmapHeight)
+	img.Pixmap = make([]byte, img.PixmapHeight * img.PixmapWidth * 4)
+
+	_, err = r.Read(img.Pixmap)
+	if err != nil {
+		return
+	}
 
 	for y := 0; y < int(img.PixmapHeight); y++ {
-		img.buffer[y] = make([]byte, 4 * img.PixmapWidth)
-		_, err = r.Read(img.buffer[y])
-		if err != nil {
-			return
-		}
+		img.buffer[y] = img.Pixmap[start:start + 4 * int(img.PixmapWidth)]
+		start += 4 * int(img.PixmapWidth)
 	}
 
 	return
@@ -185,6 +190,7 @@ func DecodeNoCopy(buf []byte) (img Xwd, err error) {
 	}
 
 	img.buffer = make([][]byte, img.PixmapHeight)
+	img.Pixmap = buf[start:]
 
 	for y := 0; y < int(img.PixmapHeight); y++ {
 		img.buffer[y] = buf[start: start + linesize]
@@ -210,6 +216,7 @@ func DecodePixNoCopy(buf []byte, img *Xwd) (err error) {
 	}
 
 	img.buffer = make([][]byte, img.PixmapHeight)
+	img.Pixmap = buf
 
 	for y := 0; y < int(img.PixmapHeight); y++ {
 		img.buffer[y] = buf[:linesize]

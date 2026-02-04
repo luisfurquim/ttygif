@@ -49,8 +49,7 @@ type XWDColorMap struct {
 
 type Xwd struct {
 	XWDFileHeader
-	bounds image.Rectangle
-	buffer [][]byte
+	PixRows [][]byte
 	Pixmap []byte
 }
 
@@ -60,43 +59,60 @@ type Color struct{
 
 var IncompleteBuffer error = errors.New("Incomplete buffer")
 
+func DecodeHeader(buf []byte, hdr *XWDFileHeader) {
+	hdr.HeaderSize        = binary.BigEndian.Uint32(buf[0:4])
+	hdr.FileVersion       = binary.BigEndian.Uint32(buf[4:8])
+	hdr.PixmapFormat      = binary.BigEndian.Uint32(buf[8:12])
+	hdr.PixmapDepth       = binary.BigEndian.Uint32(buf[12:16])
+	hdr.PixmapWidth       = binary.BigEndian.Uint32(buf[16:20])
+	hdr.PixmapHeight      = binary.BigEndian.Uint32(buf[20:24])
+	hdr.XOffset           = binary.BigEndian.Uint32(buf[24:28])
+	hdr.ByteOrder         = binary.BigEndian.Uint32(buf[28:32])
+	hdr.BitmapUnit        = binary.BigEndian.Uint32(buf[32:36])
+	hdr.BitmapBitOrder    = binary.BigEndian.Uint32(buf[36:40])
+	hdr.BitmapPad         = binary.BigEndian.Uint32(buf[40:44])
+	hdr.BitsPerPixel      = binary.BigEndian.Uint32(buf[44:48])
+	hdr.BytesPerLine      = binary.BigEndian.Uint32(buf[48:52])
+	hdr.VisualClass       = binary.BigEndian.Uint32(buf[52:56])
+	hdr.RedMask           = binary.BigEndian.Uint32(buf[56:60])
+	hdr.GreenMask         = binary.BigEndian.Uint32(buf[60:64])
+	hdr.BlueMask          = binary.BigEndian.Uint32(buf[64:68])
+	hdr.BitsPerRgb        = binary.BigEndian.Uint32(buf[68:72])
+	hdr.NumberOfColors    = binary.BigEndian.Uint32(buf[72:76])
+	hdr.ColorMapEntries   = binary.BigEndian.Uint32(buf[76:80])
+	hdr.WindowWidth       = binary.BigEndian.Uint32(buf[80:84])
+	hdr.WindowHeight      = binary.BigEndian.Uint32(buf[84:88])
+	hdr.WindowX           = binary.BigEndian.Uint32(buf[88:92])
+	hdr.WindowY           = binary.BigEndian.Uint32(buf[92:96])
+	hdr.WindowBorderWidth = binary.BigEndian.Uint32(buf[96:100])
+}
+
+func ParsePixmap(buffer [][]byte, Pixmap []byte, width int, height int) {
+	var (
+		y, start int
+		linesize int
+	)
+
+	linesize = width << 2
+
+	for y = 0; y < height; y++ {
+		buffer[y] = Pixmap[start:start + linesize]
+		start += linesize
+	}
+}
+
+
 // Decode reads a XWD image from r and returns it as an image.Image.
 func Decode(r io.Reader) (img Xwd, err error) {
 	var buf []byte
-	var start int
 
 	buf = make([]byte, 100)
 	_, err = r.Read(buf)
 	if err != nil {
 		return
 	}
-	img.XWDFileHeader = XWDFileHeader{
-		HeaderSize:        binary.BigEndian.Uint32(buf[0:4]),
-		FileVersion:       binary.BigEndian.Uint32(buf[4:8]),
-		PixmapFormat:      binary.BigEndian.Uint32(buf[8:12]),
-		PixmapDepth:       binary.BigEndian.Uint32(buf[12:16]),
-		PixmapWidth:       binary.BigEndian.Uint32(buf[16:20]),
-		PixmapHeight:      binary.BigEndian.Uint32(buf[20:24]),
-		XOffset:           binary.BigEndian.Uint32(buf[24:28]),
-		ByteOrder:         binary.BigEndian.Uint32(buf[28:32]),
-		BitmapUnit:        binary.BigEndian.Uint32(buf[32:36]),
-		BitmapBitOrder:    binary.BigEndian.Uint32(buf[36:40]),
-		BitmapPad:         binary.BigEndian.Uint32(buf[40:44]),
-		BitsPerPixel:      binary.BigEndian.Uint32(buf[44:48]),
-		BytesPerLine:      binary.BigEndian.Uint32(buf[48:52]),
-		VisualClass:       binary.BigEndian.Uint32(buf[52:56]),
-		RedMask:           binary.BigEndian.Uint32(buf[56:60]),
-		GreenMask:         binary.BigEndian.Uint32(buf[60:64]),
-		BlueMask:          binary.BigEndian.Uint32(buf[64:68]),
-		BitsPerRgb:        binary.BigEndian.Uint32(buf[68:72]),
-		NumberOfColors:    binary.BigEndian.Uint32(buf[72:76]),
-		ColorMapEntries:   binary.BigEndian.Uint32(buf[76:80]),
-		WindowWidth:       binary.BigEndian.Uint32(buf[80:84]),
-		WindowHeight:      binary.BigEndian.Uint32(buf[84:88]),
-		WindowX:           binary.BigEndian.Uint32(buf[88:92]),
-		WindowY:           binary.BigEndian.Uint32(buf[92:96]),
-		WindowBorderWidth: binary.BigEndian.Uint32(buf[96:100]),
-	}
+
+	DecodeHeader(buf, &img.XWDFileHeader)
 
 	// not used
 	// window name
@@ -107,6 +123,7 @@ func Decode(r io.Reader) (img Xwd, err error) {
 	}
 
 	// not used?
+/*
 	colorMaps := make([]XWDColorMap, img.ColorMapEntries)
 	buf = make([]byte, 12)
 	for i := 0; i < int(img.ColorMapEntries); i++ {
@@ -123,8 +140,16 @@ func Decode(r io.Reader) (img Xwd, err error) {
 			Padding:     uint8(buf[11]),
 		}
 	}
+*/
 
-	img.buffer = make([][]byte, img.PixmapHeight)
+	// ColorMaps not used, just skip them
+	buf = make([]byte, 12 * img.ColorMapEntries)
+	_, err = r.Read(buf)
+	if err != nil {
+		return
+	}
+
+	img.PixRows = make([][]byte, img.PixmapHeight)
 	img.Pixmap = make([]byte, img.PixmapHeight * img.PixmapWidth * 4)
 
 	_, err = r.Read(img.Pixmap)
@@ -132,10 +157,7 @@ func Decode(r io.Reader) (img Xwd, err error) {
 		return
 	}
 
-	for y := 0; y < int(img.PixmapHeight); y++ {
-		img.buffer[y] = img.Pixmap[start:start + 4 * int(img.PixmapWidth)]
-		start += 4 * int(img.PixmapWidth)
-	}
+	ParsePixmap(img.PixRows, img.Pixmap, int(img.PixmapWidth), int(img.PixmapHeight))
 
 	return
 }
@@ -153,33 +175,7 @@ func DecodeNoCopy(buf []byte) (img Xwd, err error) {
 		return
 	}
 
-	img.XWDFileHeader = XWDFileHeader{
-		HeaderSize:        binary.BigEndian.Uint32(buf[0:4]),
-		FileVersion:       binary.BigEndian.Uint32(buf[4:8]),
-		PixmapFormat:      binary.BigEndian.Uint32(buf[8:12]),
-		PixmapDepth:       binary.BigEndian.Uint32(buf[12:16]),
-		PixmapWidth:       binary.BigEndian.Uint32(buf[16:20]),
-		PixmapHeight:      binary.BigEndian.Uint32(buf[20:24]),
-		XOffset:           binary.BigEndian.Uint32(buf[24:28]),
-		ByteOrder:         binary.BigEndian.Uint32(buf[28:32]),
-		BitmapUnit:        binary.BigEndian.Uint32(buf[32:36]),
-		BitmapBitOrder:    binary.BigEndian.Uint32(buf[36:40]),
-		BitmapPad:         binary.BigEndian.Uint32(buf[40:44]),
-		BitsPerPixel:      binary.BigEndian.Uint32(buf[44:48]),
-		BytesPerLine:      binary.BigEndian.Uint32(buf[48:52]),
-		VisualClass:       binary.BigEndian.Uint32(buf[52:56]),
-		RedMask:           binary.BigEndian.Uint32(buf[56:60]),
-		GreenMask:         binary.BigEndian.Uint32(buf[60:64]),
-		BlueMask:          binary.BigEndian.Uint32(buf[64:68]),
-		BitsPerRgb:        binary.BigEndian.Uint32(buf[68:72]),
-		NumberOfColors:    binary.BigEndian.Uint32(buf[72:76]),
-		ColorMapEntries:   binary.BigEndian.Uint32(buf[76:80]),
-		WindowWidth:       binary.BigEndian.Uint32(buf[80:84]),
-		WindowHeight:      binary.BigEndian.Uint32(buf[84:88]),
-		WindowX:           binary.BigEndian.Uint32(buf[88:92]),
-		WindowY:           binary.BigEndian.Uint32(buf[92:96]),
-		WindowBorderWidth: binary.BigEndian.Uint32(buf[96:100]),
-	}
+	DecodeHeader(buf, &img.XWDFileHeader)
 
 	start    = int(img.XWDFileHeader.HeaderSize + 12 * img.XWDFileHeader.ColorMapEntries)
 	linesize = int(img.PixmapWidth << 2)
@@ -189,13 +185,10 @@ func DecodeNoCopy(buf []byte) (img Xwd, err error) {
 		return
 	}
 
-	img.buffer = make([][]byte, img.PixmapHeight)
+	img.PixRows = make([][]byte, img.PixmapHeight)
 	img.Pixmap = buf[start:]
 
-	for y := 0; y < int(img.PixmapHeight); y++ {
-		img.buffer[y] = buf[start: start + linesize]
-		start += linesize
-	}
+	ParsePixmap(img.PixRows, img.Pixmap, int(img.PixmapWidth), int(img.PixmapHeight))
 
 	return
 }
@@ -215,13 +208,10 @@ func DecodePixNoCopy(buf []byte, img *Xwd) (err error) {
 		return
 	}
 
-	img.buffer = make([][]byte, img.PixmapHeight)
+	img.PixRows = make([][]byte, img.PixmapHeight)
 	img.Pixmap = buf
 
-	for y := 0; y < int(img.PixmapHeight); y++ {
-		img.buffer[y] = buf[:linesize]
-		buf = buf[linesize:]
-	}
+	ParsePixmap(img.PixRows, buf, int(img.PixmapWidth), int(img.PixmapHeight))
 
 	return
 }
@@ -244,9 +234,9 @@ func (img Xwd) At(x, y int) color.Color {
 	offset = x << 2
 
 	return Color{
-		r: uint32(img.buffer[y][offset + 2]),
-		g: uint32(img.buffer[y][offset + 1]),
-		b: uint32(img.buffer[y][offset]),
+		r: uint32(img.PixRows[y][offset + 2]),
+		g: uint32(img.PixRows[y][offset + 1]),
+		b: uint32(img.PixRows[y][offset]),
 	}
 }
 
